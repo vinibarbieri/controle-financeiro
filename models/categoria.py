@@ -16,3 +16,12 @@ class Categoria:
 
     def ultrapassou_limite(self):
         return self.total_gasto() > self.limite
+
+    def gasto_mensal(self, mes: int, ano: int):
+        return sum(d.valor for d in self.despesas if d.data.month == mes and d.data.year == ano)
+
+    def ultrapassou_limite_mensal(self, mes: int, ano: int):
+        total_mes = sum(d.valor for d in self.despesas if d.data.month == mes and d.data.year == ano)
+        return total_mes > self.limite
+
+

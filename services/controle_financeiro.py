@@ -35,28 +35,70 @@ class ControleFinanceiro:
     def comparar_meses(self, mes_atual: int, ano_atual: int):
         mes_anterior = mes_atual - 1 if mes_atual > 1 else 12
         ano_anterior = ano_atual if mes_atual > 1 else ano_atual - 1
-        atual = self.historico.get((mes_atual, ano_atual), {})
-        anterior = self.historico.get((mes_anterior, ano_anterior), {})
 
         comparacao = {}
-        for cat in atual:
-            gasto_atual = atual[cat]["total"]
-            gasto_anterior = anterior.get(cat, {}).get("total", 0)
-            aumento = gasto_atual - gasto_anterior
-            comparacao[cat] = aumento
+
+        for cat, categoria in self.categorias.items():
+            atual = sum(d.valor for d in categoria.despesas if d.data.month == mes_atual and d.data.year == ano_atual)
+            anterior = sum(d.valor for d in categoria.despesas if d.data.month == mes_anterior and d.data.year == ano_anterior)
+            comparacao[cat] = atual - anterior
+
         return comparacao
+
 
     def exportar_pdf(self, relatorio, mes: int, ano: int, caminho: str = "relatorio.pdf"):
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
-        pdf.cell(200, 10, txt=f"Relatório Financeiro - {mes:02}/{ano}", ln=True, align='C')
+        pdf.cell(200, 10, txt=f"Relatório Financeiro Completo - {mes:02}/{ano}", ln=True, align='C')
+
+        comparacao = self.comparar_meses(mes, ano)
 
         for cat, dados in relatorio.items():
-            pdf.cell(200, 10, txt=f"\nCategoria: {cat} - Total Gasto: R$ {dados['total']:.2f}", ln=True)
-            for d in dados['despesas']:
-                linha = f"  - {d.data.strftime('%d/%m/%Y')} | R$ {d.valor:.2f} | {d.descricao}"
-                pdf.cell(200, 10, txt=linha, ln=True)
+            total = dados['total']
+            despesas = dados['despesas']
+            categoria = self.categorias[cat]
+
+            pdf.ln(10)
+            pdf.set_font("Arial", "B", size=12)
+            pdf.cell(200, 10, txt=f"Categoria: {cat}", ln=True)
+            pdf.set_font("Arial", size=11)
+            pdf.cell(200, 8, txt=f"Limite mensal: R$ {categoria.limite:.2f}", ln=True)
+            pdf.cell(200, 8, txt=f"Gasto no mês: R$ {total:.2f}", ln=True)
+
+            if total > categoria.limite:
+                pdf.set_text_color(255, 0, 0)  # vermelho
+                pdf.cell(200, 8, txt="Atenção: Gasto acima do limite!", ln=True)
+            else:
+                pdf.set_text_color(0, 128, 0)  # verde
+                pdf.cell(200, 8, txt="Gasto dentro do limite.", ln=True)
+
+            pdf.set_text_color(0, 0, 0)  # reset cor para preto
+
+            # Comparação com mês anterior
+            aumento = comparacao.get(cat, 0)
+            if aumento > 0:
+                pdf.cell(200, 8, txt=f"Aumento de R$ {aumento:.2f} em relação ao mês anterior.", ln=True)
+            elif aumento < 0:
+                pdf.cell(200, 8, txt=f"Redução de R$ {abs(aumento):.2f} em relação ao mês anterior.", ln=True)
+            else:
+                pdf.cell(200, 8, txt="Gasto igual ao mês anterior.", ln=True)
+
+            # Lista de despesas
+            pdf.ln(2)
+            pdf.set_font("Arial", "I", size=11)
+            pdf.cell(200, 8, txt="Despesas:", ln=True)
+            pdf.set_font("Arial", size=10)
+
+            if not despesas:
+                pdf.cell(200, 8, txt="(Sem despesas registradas neste mês)", ln=True)
+            else:
+                for d in despesas:
+                    linha = f" - {d.data.strftime('%d/%m/%Y')} | R$ {d.valor:.2f} | {d.descricao}"
+                    pdf.cell(200, 8, txt=linha, ln=True)
+
+            pdf.ln(5)  # espaçamento entre categorias
 
         pdf.output(caminho)
-        print(f"PDF exportado para {os.path.abspath(caminho)}")
+        print(f"PDF exportado com sucesso para: {os.path.abspath(caminho)}")
+
